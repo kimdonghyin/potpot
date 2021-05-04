@@ -7,8 +7,9 @@ from matplotlib import pyplot as plt
 import time
 import random
 import numpy as np
+
 #import pymysql
-import binascii
+
 from pymongo import MongoClient
 from pymongo.cursor import CursorType
 
@@ -73,7 +74,7 @@ def cCode(date): # take countryCode
     #return res_dic
     return countryCode_dic
 
-
+#
 def insert_DB(total_dic):
     host = "localhost"
     port = 27017
@@ -93,31 +94,39 @@ def insert_DB(total_dic):
 
     p_hash = re.compile('Hash : \w+')
 
-    p_command = re.compile("'\/?[A-Za-z0-9_ | \/\->\',]*")
+    p_command = re.compile("Command :.[\w|\W|\s]*.]")
 
-    print(total_dic.values())
+    p_scp = re.compile("SCP : \[\'[\w|\W]*?.\]")
+
+    print(total_dic.items())
 
     for i, j in total_dic.items():
         h = ''
         c = ''
+        s = ''
 
-        if p_hash.search(j) == None:
+        if p_hash.findall(j) == None:
             h = 'none'
         else:
-            h = str(p_hash.search(j).group())
+            h = ''.join(p_hash.findall(j))
             #print(h)
 
-        if p_command.search(j) == None:
-            c = 'none'
-
+        if p_scp.findall(j) == None:
+             s = 'none'
         else:
-            c = str(p_command.search(j).group())
-            #print(c)
+             s = ''.join(p_scp.findall(j))
+             #print(s)
+
+        if p_command.findall(j) == None:
+            c = 'none'
+        else:
+            c = ''.join(p_command.findall(j))
 
         mongo[db_name][collection_name].insert_one({'IP' : str(i) , 'Country Code' : str(p_ccode.match(j).group())[15:] ,
-                                                  'Connection Count': str(p_ccount.search(j).group())[18:] ,
+                                                  'Connection Count': str(p_ccount.search(j).group())[19:],
                                                    'File_Hash' : h[7:],
-                                                  'Command' : c}).inserted_id
+                                                    'SCP' : s[6:],
+                                                  'Command' : c[10:]}).inserted_id
     print("DB END")
 
 if __name__=='__main__':
@@ -132,12 +141,12 @@ if __name__=='__main__':
     date = ''   # data time_stamp
     attack_command_dic = {}
     temp_downIP = []
-    start_timedate = '2020-03-24'
+    start_timedate = '2020-03-04'
     scp_dic = {}
     print("-------------- START ---------------- ")
 
     #with open(path + date + '.json') as json_file:
-    with open(path + '.json') as json_file:
+    with open(path + '.json.2020-03-04') as json_file:
         data = json_file.readlines()
         
         while count < len(data)-1:
@@ -208,12 +217,11 @@ if __name__=='__main__':
 
     res_count = 0
 
+    print(scp_dic.items())
     temp_countip = count_ip()
-
 
     for i in cn_data.keys():
         temp = list(cn_data.values())
-
         for k, m in hash_dic.items():
             if k == i:
                 cn_data[i] = str(temp[res_count]) + ', Hash : '+str(m)
@@ -223,7 +231,12 @@ if __name__=='__main__':
         for z, x in temp_countip.items():
             if z == i:
                 cn_data[i] = str(temp[res_count]) + ', Connection Count : ' + str(x)
+        del temp
 
+        temp = list(cn_data.values())
+        for a, s in scp_dic.items():
+            if a == i:
+                cn_data[i] = str(temp[res_count]) + ', SCP : ' + str(s)
         del temp
 
         temp = list(cn_data.values())
@@ -239,3 +252,4 @@ if __name__=='__main__':
     del hash_dic
     del attack_command_dic
     del temp_downIP
+    del scp_dic
