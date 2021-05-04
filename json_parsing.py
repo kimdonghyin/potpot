@@ -1,7 +1,7 @@
 import json
 import re
 from urllib.request import urlopen
-#import geoip2.database
+from geoip import geolite2
 import requests
 from matplotlib import pyplot as plt
 import time
@@ -41,40 +41,49 @@ def json_key_present(json, key): #json key checking
 def cCode(date): # take countryCode
     
     url = "http://ip-api.com/json/" # site to get Country code
-    res_dic = {}
+    #res_dic = {}
     countryCode_dic = {}
     c = 0;  # count start from zero
-
-    print(len(ip_list))
+    #
+    # print(len(ip_list))
     for i in ip_list:
-        time.sleep(random.randrange(4)) # rest the random time ( this site is prevents users from visiting a lot in a short period of time )
-        if c > 150:
-            time.sleep(random.randrange(30)) # rest the random time ( this site is prevents users from visiting a lot in a short period of time )
-            c=0
-        res = requests.get(url + i) # Request the site for the country code for the ip
+        ipd = geolite2.lookup(str(i))
 
-        try:
-            ccip = json.loads(res.text) # In the json form to take response
-        except:
-            print(ccip)
-            print('---------------------')
-            print(res.text)
-            
-        if ccip['status'] in "success":            # If the response successful
-            countryCode_dic[i] = 'Country Code : ' + str(ccip['countryCode'])
-            #res_dic[i] = {'countryCode': ccip['countryCode']} # In the json form to take country code
-        c += 1
-        
+        if ipd != None:
+            countryCode_dic[i] = 'Country Code : ' + ipd.country
+        else:
+            if c > 150:
+                time.sleep(random.randrange(30)) # rest the random time ( this site is prevents users from visiting a lot in a short period of time )
+                c=0
+            res = requests.get(url + i) # Request the site for the country code for the ip
+            try:
+                ccip = json.loads(res.text) # In the json form to take response
+            except:
+                print(ccip)
+                print('---------------------')
+                print(res.text)
+
+            if ccip['status'] in "success":            # If the response successful
+                countryCode_dic[i] = 'Country Code : ' + str(ccip['countryCode'])
+                #res_dic[i] = {'countryCode': ccip['countryCode']} # In the json form to take country code
+            c += 1
+    c = 0
     print("--------------- ip data request finish -------------------")
 
     #print(res_dic)
 
     print("----------------------------------------------------------\n")
 
-    #return res_dic
+    # #return res_dic
+    # for i in ip_list:
+    #     ipd = geolite2.lookup(str(i))
+    #     print(i)
+    #     countryCode_dic[i] = 'Country Code : ' + ipd.country
+    #     print("ip : "+str(i)+" Country Code : "+ str(countryCode_dic[i]))
+
     return countryCode_dic
 
-#
+# DB insert
 def insert_DB(total_dic):
     host = "localhost"
     port = 27017
@@ -121,6 +130,9 @@ def insert_DB(total_dic):
             c = 'none'
         else:
             c = ''.join(p_command.findall(j))
+            print("====================================")
+            print(c)
+            print("====================================")
 
         mongo[db_name][collection_name].insert_one({'IP' : str(i) , 'Country Code' : str(p_ccode.match(j).group())[15:] ,
                                                   'Connection Count': str(p_ccount.search(j).group())[19:],
@@ -141,12 +153,12 @@ if __name__=='__main__':
     date = ''   # data time_stamp
     attack_command_dic = {}
     temp_downIP = []
-    start_timedate = '2020-03-04'
+    start_timedate = '.2020-03-05'
     scp_dic = {}
     print("-------------- START ---------------- ")
 
     #with open(path + date + '.json') as json_file:
-    with open(path + '.json.2020-03-04') as json_file:
+    with open(path + '.json') as json_file:
         data = json_file.readlines()
         
         while count < len(data)-1:
