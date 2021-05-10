@@ -1,7 +1,5 @@
-command = ["cat /proc/cpuinfo | grep name | wc -l",
-           "cat /proc/cpuinfo | grep nam e | wc -l"]
-
-def calc_distance(a,b):
+def calc_distance(a, b):
+    command = [a, b]
     if a==b : return 0
     a_len=len(a)
     b_len=len(b)
@@ -39,4 +37,4 @@ def calc_distance(a,b):
     print("====================================")
     return matrix[a_len][b_len] #최종적으로는, 표의 오른쪽 아래에 있는 값이 최소거리(레벤슈타인 거리)가 된다.
 
-calc_distance(command[0], command[1])
+
