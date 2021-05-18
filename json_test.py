@@ -1,272 +1,253 @@
 import json
-import re
-from urllib.request import urlopen
 from geoip import geolite2
-import requests
-from matplotlib import pyplot as plt
 import time
 import random
-import numpy as np
+import re
+import requests
 import os
-
-# import pymysql
-
 from pymongo import MongoClient
-from pymongo.cursor import CursorType
-
-ip_list = []  # this is one of ip list
-total_ip = []  # ip 전부
 
 
-def sort_ip(attack_ip):  # compare ip
+class json_parse:
+    def __init__(self):
+        self.path = "D://Sarice//potpot//logData//"
+        self.totalIP = []
+        self.ip_list = []
+        self.scp_dic = {}
+        self.hash_dic = {}
+        self.command_dic = {}
+        self.connCount_dic = {}
+        self.countryCode_dic = {}
 
-    if (attack_ip in ip_list) == False:
-        ip_list.append(attack_ip)
+    def slidStr(self, data, line):
+
+        json_data = data[line:line + 1]
+        slied_json = (str(json_data)[2:len(str(json_data)) - 4])
+        log_data = ''
+
+        try:
+            log_data = json.loads(str(slied_json).replace('\\\\\\\\\\\\\\\\', '').replace('\\\\\\\\', '').
+                                  replace('\\\\"',"").replace('\\',''))
+
+        except:
+            return ''
+
+        return log_data
+
+    def getSrcip(self, attack_ip):
+        if attack_ip not in self.ip_list:
+            self.ip_list.append(attack_ip)
+
+        self.totalIP.append(attack_ip)
+
+    def getScp(self, attack_ip, scp):
+        if realm_check:
+            if attack_ip in self.scp_dic:
+                self.scp_dic[attack_ip].append(scp)
+            else:
+                self.scp_dic[attack_ip] = [scp]
+
+    def getHash(self, attack_ip, file_hash):
+        overlap = False
+
+        if (file_hash in self.hash_dic.values()) == False:
+            for hash_i in range(len(self.hash_dic.keys()) + 1):
+                if (self.hash_dic.get(attack_ip) == None):
+                    overlap = True
+                else:
+                    overlap = False
+
+            if (overlap):
+                self.hash_dic[attack_ip] = (file_hash)
+            else:
+                self.hash_dic[attack_ip] = ((self.hash_dic[attack_ip] + ', ' + file_hash))
+
+    def getCommand(self, attack_ip, Command):
+        if (self.command_dic.get(attack_ip) == None):
+            self.command_dic[attack_ip] = [Command]
+        else:
+            self.command_dic[attack_ip].append(Command)
+
+    def getconCount(self):
+        for i in self.ip_list:
+            self.connCount_dic[i] = str(self.totalIP.count(i))
+            self.totalIP.remove(str(i))
 
 
-def count_ip():  # count ip
+    def getCountryCode(self):  # take countryCode
+        print("Country Code Start!!")
+        url = "http://ip-api.com/json/"  # site to get Country code
+        c = 0;  # count start from zero
+        global ccip
+        # print(len(ip_list))
 
-    countIP_dic = {}
-    # straighten out ip count to dicionary
-    for i in ip_list:
-        countIP_dic[i] = str(total_ip.count(i))
+        for i in self.ip_list:
+            ipd = geolite2.lookup(str(i))
+            if ipd != None:
+                self.countryCode_dic[i] = ipd.country
+            else:
+                time.sleep(random.randrange(2))
+                if c > 150:
+                    time.sleep(random.randrange(30))  # rest the random time ( this site is prevents users from visiting a lot in a short period of time )
+                    c = 0
+                res = requests.get(url + i)  # Request the site for the country code for the ip
+                try:
+                    ccip = json.loads(res.text)  # In the json form to take response
+                except:
+                    print(ccip)
+                    print('---------------------')
+                    print(res.text)
 
-    return countIP_dic
+                if ccip['status'] in "success":  # If the response successful
+                    self.countryCode_dic[i] = str(ccip['countryCode'])
+
+                c += 1
+        print("--------------- ip data request finish -------------------")
+
+    def combineData(self):
+        total_dic = {}
+
+        for i in self.ip_list:
+            if key_present(self.countryCode_dic, i ) == False:
+                self.countryCode_dic[i] = '--'
+            if key_present(self.scp_dic, i) == False:
+                self.scp_dic[i] = 'none'
+            if key_present(self.hash_dic, i) == False:
+                self.hash_dic[i] = 'none'
+            if key_present(self.command_dic, i) == False:
+                self.command_dic[i] = 'none'
+
+            temp = [str(self.countryCode_dic[i]), str(self.connCount_dic[i]), str(self.hash_dic[i]), str(self.scp_dic[i]), str(self.command_dic[i])]
+            total_dic[i] = temp
+
+            # total_dic[i] = str('Connection Count : ' + str(self.connCount_dic[i]) + ', ' +
+            #                    'Country Code : ' + str(self.countryCode_dic[i]) + ', ' +
+            #                    'Command : ' + str(self.command_dic[i]) + ', ' +
+            #                    'SCP : ' + str(self.scp_dic[i]) + ', ' +
+            #                    'Hash : ' + str(self.hash_dic[i]))
+
+        return total_dic
+
+    def __del__(self):
+        del self.totalIP
+        del self.ip_list
+        del self.scp_dic
+        del self.hash_dic
+        del self.command_dic
+        del self.connCount_dic
+        del self.countryCode_dic
+        print("Processing in End ")
+
+class mongo:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.db_name = "potpot"
+        self.client = MongoClient(host, port)
+        self.p_ccode = re.compile('Country Code : \w\w')
+        self.p_ccount = re.compile('Connection Count : \w+')
+        self.p_hash = re.compile('Hash : \w+')
+        self.p_command = re.compile("Command :.[\w|\W|\s]*.]")
+        self.p_scp = re.compile("SCP : \[\'[\w|\W]*?.\]")
+
+    def getData(self, collec_name):
+        #print(self.db_name + " : " + collec_name)
+        db_data = self.client[self.db_name][collec_name].find({})
+        return db_data
+
+    def insertData(self, total_dic , collec_name):
+
+        print("DB Connect")
+        for i in total_dic.keys():
+            self.client[self.db_name][collec_name].insert_one(
+                {'IP': str(i), 'Country Code': str(total_dic[i][0]),
+                 'Connection Count': str(total_dic[i][1]),
+                 'File_Hash': total_dic[i][2],
+                 'SCP': total_dic[i][3],
+                 'Command': total_dic[i][4]}).inserted_id
+
+        print("DB END")
 
 
-def json_key_present(json, key):  # json key checking
+class filelist:
+    def __init__(self):
+        self.path = "D://Sarice//potpot//logData//"
+        self.regx = re.compile("cowrie\d{4}-\d{2}-\d{2}[.]json")
+
+    def get_flist(self):
+        flist = os.listdir(self.path)
+        jflist = []
+        for i in flist:
+            if self.regx.match(i):
+                jflist.append(i)
+
+        return jflist
+
+    def getfile(self, filename):
+        with open(self.path + filename) as json_file:
+            data = json_file.readlines()
+
+        return data
+
+    def rename_fname(self, fname): #file name rename to mongodb Collection name
+        return fname.replace("-","_").replace(".","")
+
+    def rename_flist(self, flist):
+        for index in range(0, len(flist)):
+            flist[index] = flist[index].replace("-","_").replace(".","")
+
+        return flist
+
+def key_present(logdata, checkKey):
     try:
-        check = json[key]
+        check = logdata[checkKey]
     except KeyError:
         return False
 
     return True
 
 
-def cCode(date):  # take countryCode
+if __name__ == "__main__":
 
-    url = "http://ip-api.com/json/"  # site to get Country code
-    # res_dic = {}
-    countryCode_dic = {}
-    c = 0;  # count start from zero
-    global ccip
-    # print(len(ip_list))
-
-    for i in ip_list:
-        ipd = geolite2.lookup(str(i))
-        if ipd != None:
-            countryCode_dic[i] = 'Country Code : ' + ipd.country
-        else:
-            time.sleep(random.randrange(3))
-            if c > 150:
-                time.sleep(random.randrange(30))  # rest the random time ( this site is prevents users from visiting a lot in a short period of time )
-                c = 0
-            res = requests.get(url + i)  # Request the site for the country code for the ip
-            try:
-                ccip = json.loads(res.text)  # In the json form to take response
-            except:
-                print(ccip)
-                print('---------------------')
-                print(res.text)
-
-            if ccip['status'] in "success":  # If the response successful
-                countryCode_dic[i] = 'Country Code : ' + str(ccip['countryCode'])
-                # res_dic[i] = {'countryCode': ccip['countryCode']} # In the json form to take country code
-            c += 1
-    c = 0
-    print("--------------- ip data request finish -------------------")
-
-    return countryCode_dic
+    file = filelist()
+    flist = file.get_flist()
+    # 파일 리스트 가져오는 것을 클래스로 만들어서 할 것!
+    for fn in flist:
+        cookie = json_parse()
+        data = file.getfile(fn)
+        print("Processing Start %s" %fn)
+        for line in range(len(data)):
+            logdata = cookie.slidStr(data, line)
+            if logdata:
+                eventID = logdata['eventid']
+                srcIP = logdata['src_ip']
 
 
-# DB insert
-def insert_DB(total_dic, j):
-    host = "localhost"
-    port = 27017
-    mongo = MongoClient(host, port)
-    db_name = 'potpot'
-    collection_name = j
+                if eventID == "cowrie.session.connect":
+                    cookie.getSrcip(srcIP)
 
-    print("DB Connect")
-    # a = list(total_dic.keys())
-    # b = list(total_dic.values())
+                elif (eventID == "cowrie.session.file_download" or eventID == "cowrie.session.file_upload"):
+                    realm_check = key_present(logdata, 'realm')
 
-    p_ccode = re.compile('Country Code : \w\w')
-    # print(p_ccode.match(b[0]).group())
-
-    p_ccount = re.compile('Connection Count : \w+')
-    # print(str(p_ccount.search(b[0]).group()))
-
-    p_hash = re.compile('Hash : \w+')
-
-    p_command = re.compile("Command :.[\w|\W|\s]*.]")
-
-    p_scp = re.compile("SCP : \[\'[\w|\W]*?.\]")
-
-    for i, j in total_dic.items():
-        h = ''
-        c = ''
-        s = ''
-
-        if p_hash.findall(j) == None:
-            h = 'none'
-        else:
-            h = ''.join(p_hash.findall(j))
-            # print(h)
-
-        if p_scp.findall(j) == None:
-            s = 'none'
-        else:
-            s = ''.join(p_scp.findall(j))
-            # print(s)
-
-        if p_command.findall(j) == None:
-            c = 'none'
-        else:
-            c = ''.join(p_command.findall(j))
-
-        mongo[db_name][collection_name].insert_one({'IP': str(i), 'Country Code': str(p_ccode.match(j).group())[15:],
-                                                    'Connection Count': str(p_ccount.search(j).group())[19:],
-                                                    'File_Hash': h[7:],
-                                                    'SCP': s[6:],
-                                                    'Command': c[10:]}).inserted_id
-    print("DB END")
-
-
-if __name__ == '__main__':
-
-    count = 0
-    attack_ip = ""
-    data = ''
-    log_data = ''
-    hash_dic = {}
-    md5 = ''
-    path = "D://Sarice//potpot//logData//"
-    date = ''  # data time_stamp
-    attack_command_dic = {}
-    temp_downIP = []
-    start_timedate = '.2020-03-05'
-    scp_dic = {}
-
-    print("-------------- START ---------------- ")
-
-    file_list = []
-    jfile_list = []
-    file_list = os.listdir(path)
-    file_p = re.compile("cowrie\d{4}-\d{2}-\d{2}[.]json")
-    for i in file_list:
-        if file_p.match(i):
-            jfile_list.append(i)
-
-    print(jfile_list)
-
-    for j in jfile_list:
-        hash_dic = {}
-        attack_command_dic = {}
-        temp_downIP = []
-        scp_dic = {}
-        print("---- Processing Start : "+ j +" ----")
-        with open(path+j) as json_file:
-        # with open(path + date + '.json') as json_file:
-            data = json_file.readlines()
-
-            while count < len(data) - 1:
-
-                if data == '':
-                    break
-
-                json_data = data[count:count + 1]
-
-                slied_json = (str(json_data)[2:len(str(json_data)) - 4])
-                try:
-                    log_data = json.loads(str(slied_json).replace('\\\\\\\\\\\\\\\\', '\\').replace('\\\\\\\\', '\\').replace('\\\\"', "").replace('\\', ''))
-
-                except:
-                    print(count)
-                    #print(slied_json)
-
-                event_id = log_data["eventid"]
-                attack_ip = log_data['src_ip']
-
-                if (event_id == "cowrie.session.connect"):
-                    sort_ip(attack_ip)
-                    total_ip.append(attack_ip)
-
-                elif (event_id == "cowrie.session.file_download" or event_id == "cowrie.session.file_upload"):
-                    realm_check = json_key_present(log_data, 'realm')
                     if realm_check:
-                        scp = log_data['input']
-
-                        if attack_ip in scp_dic:
-                            scp_dic[attack_ip].append(scp)
-                        else:
-                            scp_dic[attack_ip] = [scp]
-
+                        scp = logdata['input']
+                        cookie.getScp(srcIP, scp)
                     else:
-                        file_route = log_data["outfile"]
-                        file_hash = file_route[25:]
-                        overlap = False
+                        hash = logdata['outfile']
+                        cookie.getHash(srcIP, hash[25:])
 
-                        if (file_hash in hash_dic.values()) == False:
-                            for hash_i in range(len(hash_dic.keys()) + 1):
-                                if (hash_dic.get(attack_ip) == None):
-                                    overlap = True
-                                else:
-                                    overlap = False
+                elif (eventID == "cowrie.command.input"):
+                    command = logdata["input"]
+                    cookie.getCommand(srcIP, command)
 
-                            if (overlap):
-                                hash_dic[attack_ip] = file_hash
-                            else:
-                                hash_dic[attack_ip] = (hash_dic[attack_ip] + ', ' + file_hash)
+        cookie.getconCount()
+        cookie.getCountryCode()
+
+        db = mongo("localhost", 27017)
+        db.insertData(cookie.combineData(), file.rename_fname(fn))
+
+        del cookie
+        print("Processing End %s" %(fn))
 
 
-                elif (event_id == "cowrie.command.input"):
-                    input_data = log_data["input"]
 
-                    if (attack_command_dic.get(attack_ip) == None):
-                        attack_command_dic[attack_ip] = [log_data["input"]]
-                    else:
-                        attack_command_dic[attack_ip].append(log_data["input"])
-
-                #            elif(event_id == "timestamp"):
-
-                count += 1
-
-        cn_data = cCode(date)
-
-        res_count = 0
-        temp_countip = count_ip()
-
-        for i in cn_data.keys():
-            temp = list(cn_data.values())
-            for k, m in hash_dic.items():
-                if k == i:
-                    cn_data[i] = str(temp[res_count]) + ', Hash : ' + str(m)
-            del temp
-
-            temp = list(cn_data.values())
-            for z, x in temp_countip.items():
-                if z == i:
-                    cn_data[i] = str(temp[res_count]) + ', Connection Count : ' + str(x)
-            del temp
-
-            temp = list(cn_data.values())
-            for a, s in scp_dic.items():
-                if a == i:
-                    cn_data[i] = str(temp[res_count]) + ', SCP : ' + str(s)
-            del temp
-
-            temp = list(cn_data.values())
-            for q, w in attack_command_dic.items():
-                if q == i:
-                    cn_data[i] = str(temp[res_count]) + ', Command : ' + str(w)
-
-            res_count += 1
-            del temp
-
-        insert_DB(cn_data, j.replace(".",""))
-
-        del hash_dic
-        del attack_command_dic
-        del temp_downIP
-        del scp_dic
