@@ -35,6 +35,6 @@ def calc_distance(a, b):
     print("===============일치율===============")
     print("Levenshtein : ", percent,"%")
     print("====================================")
-    return matrix[a_len][b_len] #최종적으로는, 표의 오른쪽 아래에 있는 값이 최소거리(레벤슈타인 거리)가 된다.
-
+    return  matrix [ a_len ] [ b_len ] # 최종적으로는, 표의 오른쪽 아래에있는 값이 최소 거리 (레벤 슈타인 거리)가된다.
+ㄹㅇㄴ
 
