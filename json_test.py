@@ -102,7 +102,6 @@ class json_parse:
                     self.countryCode_dic[i] = str(ccip['countryCode'])
 
                 c += 1
-        print("--------------- ip data request finish -------------------")
 
     def combineData(self):
         total_dic = {}
@@ -218,36 +217,40 @@ if __name__ == "__main__":
         print("Processing Start %s" %fn)
         for line in range(len(data)):
             logdata = cookie.slidStr(data, line)
-            if logdata:
-                eventID = logdata['eventid']
-                srcIP = logdata['src_ip']
+            if logdata == '':
+                continue
+            eventID = logdata['eventid']
+            srcIP = logdata['src_ip']
 
 
-                if eventID == "cowrie.session.connect":
-                    cookie.getSrcip(srcIP)
+            if eventID == "cowrie.session.connect":
+                cookie.getSrcip(srcIP)
 
-                elif (eventID == "cowrie.session.file_download" or eventID == "cowrie.session.file_upload"):
-                    realm_check = key_present(logdata, 'realm')
+            elif (eventID == "cowrie.session.file_download" or eventID == "cowrie.session.file_upload"):
+                realm_check = key_present(logdata, 'realm')
 
-                    if realm_check:
-                        scp = logdata['input']
-                        cookie.getScp(srcIP, scp)
-                    else:
-                        hash = logdata['outfile']
-                        cookie.getHash(srcIP, hash[25:])
+                if realm_check:
+                    scp = logdata['input']
+                    cookie.getScp(srcIP, scp)
+                else:
+                    hash = logdata['outfile']
+                    cookie.getHash(srcIP, hash[25:])
 
-                elif (eventID == "cowrie.command.input"):
-                    command = logdata["input"]
-                    cookie.getCommand(srcIP, command)
+            elif (eventID == "cowrie.command.input"):
+                command = logdata["input"]
+                cookie.getCommand(srcIP, command)
 
         cookie.getconCount()
         cookie.getCountryCode()
+
+        print(cookie.combineData())
 
         db = mongo("localhost", 27017)
         db.insertData(cookie.combineData(), file.rename_fname(fn))
 
         del cookie
         print("Processing End %s" %(fn))
+        print('---------------------------------------------')
 
 
 
