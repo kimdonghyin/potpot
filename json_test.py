@@ -119,12 +119,6 @@ class json_parse:
             temp = [str(self.countryCode_dic[i]), str(self.connCount_dic[i]), str(self.hash_dic[i]), str(self.scp_dic[i]), str(self.command_dic[i])]
             total_dic[i] = temp
 
-            # total_dic[i] = str('Connection Count : ' + str(self.connCount_dic[i]) + ', ' +
-            #                    'Country Code : ' + str(self.countryCode_dic[i]) + ', ' +
-            #                    'Command : ' + str(self.command_dic[i]) + ', ' +
-            #                    'SCP : ' + str(self.scp_dic[i]) + ', ' +
-            #                    'Hash : ' + str(self.hash_dic[i]))
-
         return total_dic
 
     def __del__(self):
@@ -251,6 +245,3 @@ if __name__ == "__main__":
         del cookie
         print("Processing End %s" %(fn))
         print('---------------------------------------------')
-
-
-
