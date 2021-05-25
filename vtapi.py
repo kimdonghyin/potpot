@@ -21,8 +21,7 @@ def uncompress_gzip(path):
                 f2.write(content)
             return content
     except EOFError:
-        f.close()
-        os.remove(path)
+        pass
 
 
 def calc_file_hash(path):
